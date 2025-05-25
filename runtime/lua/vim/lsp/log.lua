@@ -115,6 +115,40 @@ for level, levelnr in pairs(log_levels) do
   log.levels[levelnr] = level
 end
 
+-- Represents a minimal snapshot of where a log call occurred.
+-- Used to customize log headers.
+---@class LogCallsiteInfo
+---@field short_src string
+---@field currentline integer
+
+-- Current header formatter. Can be overridden via `log.set_header_func`.
+---@type fun(level: string, info: LogCallsiteInfo): string
+local header_func = function(level, info)
+  return string.format(
+    '[%s][%s] %s:%s',
+    level,
+    os.date(log_date_format),
+    info.short_src,
+    info.currentline
+  )
+end
+
+-- Allow user to override how headers are formatted in logs.
+---@param handle fun(level: string, info: LogCallsiteInfo): string
+function log.set_header_func(handle)
+  header_func = handle
+end
+
+-- Function to get caller info for logging.
+---@return LogCallsiteInfo
+local get_func_info = function()
+  local dbg = debug.getinfo(2, 'Sl')
+  return {
+    short_src = dbg.short_src,
+    currentline = dbg.currentline,
+  }
+end
+
 --- @param level string
 --- @param levelnr integer
 --- @return fun(...:any): boolean?
@@ -130,14 +164,7 @@ local function create_logger(level, levelnr)
     if not open_logfile() then
       return false
     end
-    local info = debug.getinfo(2, 'Sl')
-    local header = string.format(
-      '[%s][%s] %s:%s',
-      level,
-      os.date(log_date_format),
-      info.short_src,
-      info.currentline
-    )
+    local header = header_func(level, get_func_info())
     local parts = { header }
     for i = 1, argc do
       local arg = select(i, ...)
