@@ -76,6 +76,7 @@
 #include "nvim/popupmenu.h"
 #include "nvim/pos_defs.h"
 #include "nvim/runtime.h"
+#include "nvim/session.h"
 #include "nvim/sign_defs.h"
 #include "nvim/state.h"
 #include "nvim/statusline.h"
@@ -1364,7 +1365,9 @@ Dict nvim_get_context(Dict(context) *opts, Arena *arena, Error *err)
           int_types |= kCtxSFuncs;
         } else if (strequal(s, "funcs")) {
           int_types |= kCtxFuncs;
-        } else {
+        } else if (strequal(s, "ui")) {
+          int_types |= kCtxUI;}
+        else {
           VALIDATE_S(false, "type", s, {
             return (Dict)ARRAY_DICT_INIT;
           });
@@ -1400,6 +1403,57 @@ Object nvim_load_context(Dict dict, Error *err)
 
   did_emsg = save_did_emsg;
   return (Object)OBJECT_INIT;
+}
+
+Integer nvim_save_session(String fname)
+  FUNC_API_SINCE(6)
+{
+  // TODO(rk-dev): Move these into session.c
+
+  Context ctx = CONTEXT_INIT;
+  Context* p_ctx = &ctx;
+
+  Dict ui = ARRAY_DICT_INIT;
+  Arena arena = ARENA_EMPTY;
+
+  ctx_save(p_ctx, kCtxAll);
+  Dict temp_d =  ctx_to_dict(p_ctx, &arena);
+
+  for (size_t i = 0; i < temp_d.size; i++) {
+    KeyValuePair item = temp_d.items[i];
+    if (item.value.type != kObjectTypeDict) {
+      continue;
+    }
+    if (strequal(item.key.data, "ui")) {
+      ui = item.value.data.dict;
+    }
+  }
+
+  session_save_to_file(&ui, fname.data);
+
+  ctx_free(p_ctx);
+  ArenaMem mem = arena_finish(&arena);
+  arena_mem_free(mem);
+  
+  return 0;
+}
+
+
+Dict nvim_load_session(void)
+  FUNC_API_SINCE(6)
+{
+  Context ctx = CONTEXT_INIT;
+
+  int save_did_emsg = did_emsg;
+  did_emsg = false;
+
+  Dict d = session_restore();
+  //Do Something
+
+  ctx_free(&ctx);
+
+  did_emsg = save_did_emsg;
+  return d;
 }
 
 /// Gets the current mode. |mode()|

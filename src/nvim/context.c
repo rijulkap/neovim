@@ -1,4 +1,4 @@
-// Context: snapshot of the entire editor state as one big object/map
+// Context: snapshot of jhe entire editor state as one big object/map
 
 #include <assert.h>
 #include <stdbool.h>
@@ -25,12 +25,14 @@
 #include "nvim/option_defs.h"
 #include "nvim/shada.h"
 
+#include "nvim/session.h"
+
 #ifdef INCLUDE_GENERATED_DECLARATIONS
 # include "context.c.generated.h"
 #endif
 
 int kCtxAll = (kCtxRegs | kCtxJumps | kCtxBufs | kCtxGVars | kCtxSFuncs
-               | kCtxFuncs);
+               | kCtxFuncs | kCtxUI);
 
 static ContextVec ctx_stack = KV_INITIAL_VALUE;
 
@@ -72,6 +74,7 @@ void ctx_free(Context *ctx)
   api_free_string(ctx->bufs);
   api_free_string(ctx->gvars);
   api_free_array(ctx->funcs);
+  api_free_dict(ctx->ui);
 }
 
 /// Saves the editor state to a context.
@@ -109,7 +112,12 @@ void ctx_save(Context *ctx, const int flags)
   } else if (flags & kCtxSFuncs) {
     ctx_save_funcs(ctx, true);
   }
+
+  if (flags & kCtxUI) {
+    ctx->ui = get_ui_layout();
+  }
 }
+
 
 /// Restores the editor state from a context.
 ///
@@ -152,6 +160,10 @@ bool ctx_restore(Context *ctx, const int flags)
 
   if (flags & kCtxFuncs) {
     ctx_restore_funcs(ctx);
+  }
+
+  if (flags & kCtxUI) {
+    // Dict d = session_restore();
   }
 
   if (free_ctx) {
@@ -276,13 +288,14 @@ Dict ctx_to_dict(Context *ctx, Arena *arena)
 {
   assert(ctx != NULL);
 
-  Dict rv = arena_dict(arena, 5);
+  Dict rv = arena_dict(arena, 6);
 
   PUT_C(rv, "regs", ARRAY_OBJ(string_to_array(ctx->regs, false, arena)));
   PUT_C(rv, "jumps", ARRAY_OBJ(string_to_array(ctx->jumps, false, arena)));
   PUT_C(rv, "bufs", ARRAY_OBJ(string_to_array(ctx->bufs, false, arena)));
   PUT_C(rv, "gvars", ARRAY_OBJ(string_to_array(ctx->gvars, false, arena)));
   PUT_C(rv, "funcs", ARRAY_OBJ(copy_array(ctx->funcs, arena)));
+  PUT_C(rv, "ui", DICT_OBJ(copy_dict(ctx->ui, arena)));
 
   return rv;
 }
@@ -320,6 +333,9 @@ int ctx_from_dict(Dict dict, Context *ctx, Error *err)
     } else if (strequal(item.key.data, "funcs")) {
       types |= kCtxFuncs;
       ctx->funcs = copy_object(item.value, NULL).data.array;
+    } else if (strequal(item.key.data, "ui")) {
+      types |= kCtxUI;
+      ctx->ui = copy_dict(item.value.data.dict,NULL);
     }
   }
 
