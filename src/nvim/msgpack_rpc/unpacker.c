@@ -536,21 +536,30 @@ bool unpacker_parse_redraw(Unpacker *p)
 String unpack_string(const char **data, size_t *size)
 {
   const char *data2 = *data;
-  size_t size2 = *size;
+  size_t size2       = *size;
   mpack_token_t tok;
-
-  // TODO(bfredl): this code is hot a f, specialize!
   int result = mpack_rtoken(&data2, &size2, &tok);
-  if (result || (tok.type != MPACK_TOKEN_STR && tok.type != MPACK_TOKEN_BIN)) {
+  if (result != 0
+      || (tok.type != MPACK_TOKEN_STR && tok.type != MPACK_TOKEN_BIN)) {
     return (String)STRING_INIT;
   }
-  if (*size < tok.length) {
-    // result = MPACK_EOF;
+
+  if (size2 < tok.length) {
     return (String)STRING_INIT;
   }
-  (*data) = data2 + tok.length;
-  (*size) = size2 - tok.length;
-  return cbuf_as_string((char *)data2, tok.length);
+
+  size_t len = tok.length;
+  char *buf = xmalloc(len + 1);
+  memcpy(buf, data2, len);
+  buf[len] = '\0';
+
+  *data = data2 + len;
+  *size = size2 - len;
+
+  String ret;
+  ret.data = buf;
+  ret.size = len;
+  return ret;
 }
 
 /// @return -1 if not an array or EOF. otherwise size of valid array

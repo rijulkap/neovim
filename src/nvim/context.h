@@ -10,7 +10,8 @@ typedef struct {
   String jumps;    ///< Jumplist.
   String bufs;     ///< Buffer list.
   String gvars;    ///< Global variables.
-  Array funcs;              ///< Functions.
+  Array funcs;     ///< Functions.
+  Dict ui;
 } Context;
 typedef kvec_t(Context) ContextVec;
 
@@ -20,6 +21,7 @@ typedef kvec_t(Context) ContextVec;
   .bufs = STRING_INIT, \
   .gvars = STRING_INIT, \
   .funcs = ARRAY_DICT_INIT, \
+  .ui = ARRAY_DICT_INIT, \
 }
 
 typedef enum {
@@ -29,6 +31,7 @@ typedef enum {
   kCtxGVars = 8,      ///< Global variables
   kCtxSFuncs = 16,    ///< Script functions
   kCtxFuncs = 32,     ///< Functions
+  kCtxUI = 64,        ///< Tabs
 } ContextTypeFlags;
 
 extern int kCtxAll;
